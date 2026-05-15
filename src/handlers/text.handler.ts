@@ -1,0 +1,40 @@
+import type { Message as WechatyMessage, Contact } from 'wechaty';
+import { LLMAdapter, Message } from '../llm/interface';
+import { ContextManager } from '../llm/context';
+import { logger } from '../utils/logger';
+
+export async function handleText(
+  msg: WechatyMessage,
+  contact: Contact,
+  llmAdapter: LLMAdapter,
+  contextManager: ContextManager,
+  contextId?: string,
+  overriddenText?: string
+): Promise<void> {
+  const userText = overriddenText ?? msg.text();
+  const effectiveId = contextId ?? contact.id;
+
+  try {
+    // Build user message
+    const userMsg: Message = { role: 'user', content: userText };
+    contextManager.addMessage(effectiveId, userMsg);
+
+    // Get conversation history
+    const history = contextManager.getHistory(effectiveId);
+
+    // Call LLM
+    logger.info(`[LLM] 发送给 ${llmAdapter.name}: "${userText.slice(0, 50)}..."`);
+    const response = await llmAdapter.chat(history);
+
+    // Store assistant response
+    const assistantMsg: Message = { role: 'assistant', content: response.content };
+    contextManager.addMessage(effectiveId, assistantMsg);
+
+    // Send reply
+    await msg.say(response.content);
+    logger.info(`[LLM] 回复已发送给 ${contact.name()} (ctx=${effectiveId.slice(0, 20)}...): "${response.content.slice(0, 50)}..."`);
+  } catch (error) {
+    logger.error(`[LLM] 处理 ${contact.name()} 的消息时出错:`, error);
+    await msg.say('抱歉，我遇到了一些问题，请稍后再试。');
+  }
+}

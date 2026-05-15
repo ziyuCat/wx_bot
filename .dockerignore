@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+dashboard/node_modules/
+
+# Build output (will be rebuilt inside Docker)
+dist/
+dashboard/dist/
+
+# Environment secrets (should be injected via docker-compose/env)
+.env
+
+# Git
+.git/
+.gitignore
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Runtime data (mounted as volumes)
+WxBot.memory-card.json
+.device.json
+
+# TypeScript build info
+tsconfig.tsbuildinfo
+dashboard/tsconfig.tsbuildinfo
+
+# Misc
+nul
+README.md
+API.md

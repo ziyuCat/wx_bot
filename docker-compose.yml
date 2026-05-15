@@ -1,0 +1,45 @@
+# ============================================
+# WxBot Docker Compose 配置
+# ============================================
+
+services:
+  wx-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wx-bot:latest
+    container_name: wx-bot
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"
+
+    # 环境变量（LLM API 密钥等敏感信息通过此处配置）
+    environment:
+      - WEB_PORT=3000
+      - LOG_LEVEL=1
+      # LLM API 密钥（必填，根据 config/default.json 中的 llm.provider 选择）
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - QWEN_API_KEY=${QWEN_API_KEY:-}
+      # 视频下载器地址（可选，覆盖 default.json 配置）
+      # - DOWNLOADER_API_URL=https://www.yyyc1000.site
+
+    # 也可以在项目根目录创建 .env 文件，使用 env_file 方式加载
+    # env_file:
+    #   - .env
+
+    # 持久化数据卷（保持登录态和设备标识）
+    volumes:
+      - bot-data:/app/data
+
+    # 如需从宿主机挂载持久化数据文件（首次启动后生成），取消注释：
+    # - ./WxBot.memory-card.json:/app/WxBot.memory-card.json
+    # - ./.device.json:/app/.device.json
+
+    # 生产环境配置覆盖（如需切换 LLM 提供商）
+    # 取消注释即可启用 production.json：
+    # - ./config/_production.json.disabled:/app/config/production.json:ro
+
+volumes:
+  bot-data:
+    driver: local

@@ -1,0 +1,20 @@
+{
+  "puppet": {
+    "type": "wechat4u",
+    "options": {}
+  },
+  "llm": {
+    "provider": "mock",
+    "options": {
+      "model": "echo"
+    }
+  },
+  "bot": {
+    "name": "WxBot",
+    "maxContextMessages": 10,
+    "noteImageThreshold": 3
+  },
+  "downloader": {
+    "apiUrl": "https://www.yyyc1000.site"
+  }
+}

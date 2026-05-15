@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 16% 8%;
+    --foreground: 210 40% 96%;
+    --card: 220 16% 10%;
+    --card-foreground: 210 40% 96%;
+    --popover: 220 16% 10%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 145 76% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 14%;
+    --secondary-foreground: 210 40% 90%;
+    --muted: 220 14% 14%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 195 100% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 14% 18%;
+    --input: 220 14% 18%;
+    --ring: 145 76% 42%;
+    --radius: 0.5rem;
+    --success: 145 60% 48%;
+    --warn: 40 100% 50%;
+    --error: 0 72% 55%;
+
+    /* Sidebar tokens */
+    --sidebar: 220 16% 6%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-muted: 220 14% 12%;
+    --sidebar-accent: 145 76% 42% / 0.12;
+    --sidebar-border: 220 14% 14%;
+    --sidebar-width: 240px;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background-image:
+      radial-gradient(ellipse at top, hsl(220 16% 12%), transparent 70%),
+      radial-gradient(ellipse at bottom right, hsl(145 76% 42% / 0.05), transparent 60%);
+    background-attachment: fixed;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: hsl(var(--background)); }
+::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+
+/* Log line animations */
+@keyframes log-in {
+  from { opacity: 0; background: hsl(var(--primary) / 0.08); }
+  to { opacity: 1; background: transparent; }
+}
+.log-entry-new { animation: log-in 0.4s ease-out; }
+
+/* Sidebar nav item active indicator */
+@keyframes nav-active-in {
+  from { width: 0; }
+  to { width: 3px; }
+}
+.nav-active-indicator { animation: nav-active-in 0.25s ease-out; }
