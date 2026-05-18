@@ -8,7 +8,7 @@ export function createLLMAdapter(config: LLMConfig): LLMAdapter {
 
   switch (config.provider) {
     case 'mock':
-      return new MockAdapter();
+      return new MockAdapter(config.options as { mockEcho?: boolean });
 
     case 'openai':
       // Lazy load: only require openai when actually used

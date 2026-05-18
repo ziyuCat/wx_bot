@@ -1,6 +1,7 @@
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
+import { execSync } from 'child_process';
 import type { Message as WechatyMessage, Contact } from 'wechaty';
 import { FileBox } from 'file-box';
 import sharp from 'sharp';
@@ -8,6 +9,48 @@ import { DownloaderClient, ParseResult, VideoSource, ImageInfo, VideoDetail } fr
 import { logger } from '../utils/logger';
 
 // ---- Helpers ----
+
+function detectVideoCodec(filePath: string): string {
+  // 1) Try ffprobe first (most reliable)
+  try {
+    const result = execSync(
+      `ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
+      { timeout: 5000, encoding: 'utf-8' }
+    ).trim();
+    if (result) {
+      return result; // e.g. "h264", "hevc", "vp9"
+    }
+  } catch {
+    // ffprobe not available or failed → fall through to header scan
+  }
+
+  // 2) Fallback: scan the first 4KB for mp4 codec identifiers
+  try {
+    const fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.alloc(4096);
+    fs.readSync(fd, buf, 0, 4096, 0);
+    fs.closeSync(fd);
+    const head = buf.toString('ascii', 0, 4096);
+
+    // HEVC identifiers in mp4 stsd / ftyp boxes
+    if (head.includes('hvc1') || head.includes('hev1') || head.includes('hvcC')) {
+      return 'hevc';
+    }
+    // AVC identifiers
+    if (head.includes('avc1') || head.includes('avcC')) {
+      return 'h264';
+    }
+    // Check ftyp major brand
+    const ftypBrand = head.slice(8, 12);
+    if (ftypBrand === 'heic' || ftypBrand === 'heix' || ftypBrand === 'hevc' || ftypBrand === 'hvc1') {
+      return 'hevc';
+    }
+  } catch {
+    // File read failed
+  }
+
+  return '未知';
+}
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
@@ -158,8 +201,21 @@ function pickBestSource(sources: VideoSource[]): VideoSource | null {
   logger.info(
     `[视频分享] 已选择视频源: id="${best.id}", 标签="${best.label}", ` +
     `水印=${best.watermark}, 码率=${best.bitRate || 'N/A'}, ` +
-    `分辨率=${best.width}x${best.height}`
+    `分辨率=${best.width}x${best.height}, ` +
+    `源大小=${best.sizeBytes || 'N/A'}字节, H265=${best.isH265 !== undefined ? best.isH265 : 'N/A'}`
   );
+
+  // 可选源信息一览
+  if (sources.length > 1) {
+    for (const s of sorted) {
+      logger.info(
+        `[视频分享]   备选: id="${s.id}", 分辨率=${s.width}x${s.height}, ` +
+        `码率=${s.bitRate || 'N/A'}, H265=${s.isH265 !== undefined ? s.isH265 : 'N/A'}, ` +
+        `大小=${s.sizeBytes || 'N/A'}字节`
+      );
+    }
+  }
+
   return best;
 }
 
@@ -168,7 +224,7 @@ function pickBestSource(sources: VideoSource[]): VideoSource | null {
 async function handleVideo(
   msg: WechatyMessage,
   parseResult: ParseResult,
-  downloader: DownloaderClient
+  downloader: DownloaderClient,
 ): Promise<void> {
   const meta = parseResult.metadata!;
 
@@ -205,7 +261,17 @@ async function handleVideo(
   try {
     await downloader.downloadFile(prepareResult.downloadUrl, tmpPath);
     const stat = fs.statSync(tmpPath);
-    logger.info(`[视频分享] 已下载: ${stat.size} 字节`);
+    const srcSize = bestSource.sizeBytes || 0;
+    const sizeDiff = srcSize > 0 ? `${stat.size} vs 源${srcSize} (${(stat.size / srcSize * 100).toFixed(1)}%)` : `${stat.size}`;
+
+    // 检测实际编码格式（仅用于日志）
+    const codec = detectVideoCodec(tmpPath);
+    const codecWarn = codec === 'hevc' ? ' ⚠️H.265 编码，微信可能压缩' : '';
+    logger.info(
+      `[视频分享] 已下载: ${sizeDiff} 字节, ` +
+      `时长=${meta.durationMs ? formatDuration(meta.durationMs) : 'N/A'}, ` +
+      `编码=${codec}${codecWarn}`
+    );
 
     const fileBox = createMediaBox(tmpPath, prepareResult.fileName);
     await msg.say(fileBox);
@@ -384,7 +450,7 @@ export async function handleVideoShare(
   contact: Contact,
   text: string,
   downloader: DownloaderClient,
-  noteImageThreshold: number
+  noteImageThreshold: number,
 ): Promise<void> {
   logger.info(`[分享处理] 正在为 ${contact.name()} 处理`);
 

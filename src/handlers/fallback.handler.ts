@@ -9,5 +9,5 @@ export async function handleFallback(
   const typeName = types.Message[msgType] || 'Unknown';
   logger.info(`[Fallback] 非文本消息类型: ${typeName}`);
 
-  await msg.say('抱歉，目前我只支持文字聊天。请发送文字消息给我。');
+  // await msg.say('抱歉，目前我只支持文字聊天。请发送文字消息给我。');
 }

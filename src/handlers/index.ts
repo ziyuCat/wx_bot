@@ -35,7 +35,7 @@ export async function routeMessage(
   contextManager: ContextManager,
   botName: string,
   downloader: DownloaderClient,
-  noteImageThreshold: number
+  noteImageThreshold: number,
 ): Promise<void> {
   // Ignore self messages to prevent loops
   if (msg.self()) {

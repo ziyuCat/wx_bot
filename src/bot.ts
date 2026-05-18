@@ -2,6 +2,7 @@ import { WechatyBuilder, types, qrcodeValueToImageUrl } from 'wechaty';
 import type { Wechaty } from 'wechaty';
 import { MemoryCard } from 'memory-card';
 import { LLMAdapter } from './llm/interface';
+import { MockAdapter } from './llm/adapters/mock';
 import { ContextManager } from './llm/context';
 import { routeMessage } from './handlers';
 import { DownloaderClient } from './downloader/api';
@@ -55,6 +56,29 @@ export class WeChatBot {
       const wechat4uGlobal = require('wechat4u/lib/util/global.js');
       wechat4uGlobal.getDeviceID = () => this.deviceId;
       logger.info(`已 patch wechat4u 设备 ID (global.js)`);
+    } catch {
+      // Non-wechat4u puppet, skip
+    }
+
+    // Patch syncCheck to handle unexpected retcode values (e.g. retcode=1) as
+    // logout conditions instead of crashing with an assertion error "1 == 0".
+    // Without this patch, any non-0 non-1101 retcode causes the bot to hang
+    // after QR scan with no recovery.
+    try {
+      const wechat4uCore = require('wechat4u/lib/core.js');
+      const WechatCore = wechat4uCore.default;
+      const AlreadyLogoutError = wechat4uCore.AlreadyLogoutError;
+      const origSyncCheck = WechatCore.prototype.syncCheck;
+      WechatCore.prototype.syncCheck = function () {
+        return origSyncCheck.call(this).catch((err: any) => {
+          if (err && err.tips === '同步失败') {
+            logger.warn('SyncCheck 失败，视为会话失效，触发重新登录:', err.message);
+            throw new AlreadyLogoutError('syncCheck retcode indicates re-login needed');
+          }
+          throw err;
+        });
+      };
+      logger.info('已 patch wechat4u syncCheck 错误处理');
     } catch {
       // Non-wechat4u puppet, skip
     }
@@ -146,6 +170,17 @@ export class WeChatBot {
     this.config.downloader.apiUrl = newUrl;
   }
 
+  /**
+   * 动态切换 Mock 复读模式（仅 Mock 适配器有效）
+   */
+  setMockEcho(enabled: boolean): void {
+    if (this.llmAdapter instanceof MockAdapter) {
+      this.llmAdapter.setMockEcho(enabled);
+    } else {
+      logger.warn('setMockEcho 仅对 Mock 适配器有效，当前 LLM 提供商为:', this.llmAdapter.name);
+    }
+  }
+
   private onScan(qrcodeVal: string, status: number): void {
     const statusName = types.ScanStatus[status] || 'Unknown';
     logger.info(`请扫描二维码登录 (状态: ${status} ${statusName})`);
@@ -208,9 +243,26 @@ export class WeChatBot {
     }
   }
 
-  private onError(error: Error): void {
+  private async onError(error: Error): Promise<void> {
     logger.error('机器人错误:', error.message);
-    // 未登录阶段的错误（如 1101 syncCheck 断言）属于正常现象，不改变状态
+
+    // SyncCheck assertion errors (e.g. "1 == 0") indicate an invalid session.
+    // Clear stale session data so the next restart shows a fresh QR code.
+    if (/^\d+\s*==\s*\d+$/.test(error.message?.trim() ?? '')) {
+      logger.warn('检测到 SyncCheck 断言错误，清理过期会话数据...');
+      try {
+        await this.memory.delete('PUPPET-WECHAT4U');
+        await this.memory.save();
+        logger.info('已清理过期会话，将在下次启动时重新扫码');
+      } catch (e) {
+        logger.warn('清理会话失败:', (e as Error).message);
+      }
+      // Update status so the dashboard reflects the issue
+      updateBotStatus({ state: 'waiting_scan', qrcode: undefined, qrcodeImageUrl: undefined });
+      return;
+    }
+
+    // Errors during non-logged-in phase (e.g., 1101 syncCheck) are normal, don't change state
     const state = getBotStatus().state;
     if (state !== 'logged_in') return;
     updateBotStatus({ state: 'error' });

@@ -6,7 +6,8 @@
   "llm": {
     "provider": "mock",
     "options": {
-      "model": "echo"
+      "model": "echo",
+      "mockEcho": true
     }
   },
   "bot": {

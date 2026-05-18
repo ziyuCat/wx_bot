@@ -26,6 +26,12 @@ export async function handleText(
     logger.info(`[LLM] 发送给 ${llmAdapter.name}: "${userText.slice(0, 50)}..."`);
     const response = await llmAdapter.chat(history);
 
+    // 如果 LLM 返回空内容（如 Mock 关闭复读），不存储也不回复
+    if (!response.content) {
+      logger.info(`[LLM] 空响应，跳过回复 (ctx=${effectiveId.slice(0, 20)}...)`);
+      return;
+    }
+
     // Store assistant response
     const assistantMsg: Message = { role: 'assistant', content: response.content };
     contextManager.addMessage(effectiveId, assistantMsg);

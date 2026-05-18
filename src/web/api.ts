@@ -8,6 +8,7 @@ const router = Router();
 // 机器人实例引用（由 index.ts 设置）
 interface BotInstance {
   updateDownloaderUrl(url: string): void;
+  setMockEcho(enabled: boolean): void;
   logout(): Promise<void>;
 }
 let botInstance: BotInstance | null = null;
@@ -172,6 +173,10 @@ router.post('/config', (req: Request, res: Response) => {
         if (opts.options && typeof opts.options === 'object') {
           const o = opts.options as Record<string, unknown>;
           if (o.apiKey) delete o.apiKey;
+          // 实时同步 Mock 复读开关
+          if (typeof o.mockEcho === 'boolean' && botInstance) {
+            botInstance.setMockEcho(o.mockEcho);
+          }
         }
       }
     }

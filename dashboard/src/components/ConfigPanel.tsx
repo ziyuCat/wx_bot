@@ -35,6 +35,7 @@ export function ConfigPanel() {
   const [maxContextMessages, setMaxContextMessages] = useState(10)
   const [llmModel, setLlmModel] = useState('')
   const [llmBaseUrl, setLlmBaseUrl] = useState('')
+  const [mockEcho, setMockEcho] = useState(true)
 
   // 加载配置
   const loadConfig = async () => {
@@ -50,6 +51,11 @@ export function ConfigPanel() {
       setMaxContextMessages(data.bot?.maxContextMessages || 10)
       setLlmModel((data.llm?.options?.model as string) || '')
       setLlmBaseUrl((data.llm?.options?.baseURL as string) || '')
+      setMockEcho(
+        data.llm?.options?.mockEcho !== undefined
+          ? (data.llm.options.mockEcho as boolean)
+          : true
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载配置失败')
     } finally {
@@ -75,13 +81,23 @@ export function ConfigPanel() {
     }
 
     // 机器人配置
-    if (botName !== config?.bot?.name || maxContextMessages !== config?.bot?.maxContextMessages) {
+    if (
+      botName !== config?.bot?.name ||
+      maxContextMessages !== config?.bot?.maxContextMessages
+    ) {
       updates.bot = { name: botName, maxContextMessages }
     }
 
     // LLM 配置
-    if (llmModel !== config?.llm?.options?.model || llmBaseUrl !== config?.llm?.options?.baseURL) {
-      updates.llm = { options: { model: llmModel, baseURL: llmBaseUrl } }
+    const currentMockEcho = config?.llm?.options?.mockEcho !== undefined
+      ? (config.llm.options.mockEcho as boolean)
+      : true
+    if (
+      llmModel !== config?.llm?.options?.model ||
+      llmBaseUrl !== config?.llm?.options?.baseURL ||
+      mockEcho !== currentMockEcho
+    ) {
+      updates.llm = { options: { model: llmModel, baseURL: llmBaseUrl, mockEcho } }
     }
 
     if (Object.keys(updates).length === 0) {
@@ -119,6 +135,11 @@ export function ConfigPanel() {
     setMaxContextMessages(config.bot?.maxContextMessages || 10)
     setLlmModel((config.llm?.options?.model as string) || '')
     setLlmBaseUrl((config.llm?.options?.baseURL as string) || '')
+    setMockEcho(
+      config.llm?.options?.mockEcho !== undefined
+        ? (config.llm.options.mockEcho as boolean)
+        : true
+    )
     setError(null)
     setSuccess(false)
   }
@@ -271,6 +292,34 @@ export function ConfigPanel() {
                 />
               </div>
             </div>
+            {/* Mock 模式专属：复读开关 */}
+            {config?.llm?.provider === 'mock' && (
+              <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                <div>
+                  <label className="text-xs text-muted-foreground">
+                    Mock 复读模式
+                  </label>
+                  <p className="text-[10px] text-muted-foreground/60">
+                    开启时机器人复读收到的消息，关闭时返回固定占位回复
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMockEcho(!mockEcho)}
+                  className={cn(
+                    "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200",
+                    mockEcho ? "bg-primary" : "bg-muted-foreground/30"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200",
+                      mockEcho ? "translate-x-4" : "translate-x-0"
+                    )}
+                  />
+                </button>
+              </div>
+            )}
             <p className="text-[10px] text-muted-foreground/70">
               注意：修改 LLM 提供商（mock/openai/qwen）需要修改配置文件并重启服务。此处仅可调整当前提供商的模型参数。
             </p>
